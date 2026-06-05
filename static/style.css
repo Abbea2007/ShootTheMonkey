@@ -1,0 +1,275 @@
+/*
+  style.css — Estilos de "Shoot the Monkey"
+  ==========================================
+  Usamos variables CSS (--variables) para mantener los colores consistentes.
+  El diseño es mobile-friendly con CSS Grid y Flexbox.
+*/
+
+/* ── Variables globales ──────────────────────────────────────────────────── */
+:root {
+  --bg-page:      #0d1117;
+  --bg-panel:     #161b22;
+  --bg-card:      #1c2330;
+  --border:       #30363d;
+  --text-prim:    #e6edf3;
+  --text-sec:     #8b949e;
+  --accent:       #f5a623;
+  --accent-blue:  #58a6ff;
+  --accent-teal:  #3fb950;
+  --accent-red:   #ff6b6b;
+  --radius:       10px;
+}
+
+/* ── Reset básico ────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-prim);
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  color: var(--text-sec);
+  font-size: 0.95rem;
+  margin-top: 4px;
+}
+
+/* ── Layout principal (dos columnas en pantallas grandes) ────────────────── */
+main {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+@media (max-width: 700px) {
+  main { grid-template-columns: 1fr; }
+}
+
+/* ── Panel de controles ──────────────────────────────────────────────────── */
+.panel-controles {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.panel-controles h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Cada control (label + slider + valor) ───────────────────────────────── */
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group label {
+  font-size: 0.875rem;
+  color: var(--text-prim);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.unit {
+  color: var(--text-sec);
+  font-size: 0.8rem;
+}
+
+/*
+  El slider (input range) lo personalizamos con pseudo-elementos.
+  ::-webkit-slider-thumb  → la bolita que arrastrás
+  ::-webkit-slider-runnable-track → la barra
+*/
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.valor {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: right;
+}
+
+/* ── Botones ──────────────────────────────────────────────────────────────── */
+.botones {
+  display: flex;
+  gap: 8px;
+  margin-top: 0.5rem;
+}
+
+button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+button:active { transform: scale(0.97); }
+
+.btn-primario {
+  background: var(--accent);
+  color: #000;
+}
+
+.btn-primario:hover { opacity: 0.85; }
+
+.btn-secundario {
+  background: var(--bg-card);
+  color: var(--text-prim);
+  border: 1px solid var(--border);
+}
+
+.btn-secundario:hover { background: var(--border); }
+
+/* ── Info box (datos calculados por Python) ───────────────────────────────── */
+.info-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-sec);
+  line-height: 1.6;
+  margin-top: 0.5rem;
+}
+
+.info-box strong { color: var(--accent); }
+
+.info-box .dato {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.info-box .dato:last-child { border-bottom: none; }
+.info-box .dato .etiqueta { color: var(--text-sec); }
+.info-box .dato .numero   { color: var(--accent); font-weight: 700; }
+
+/* ── Panel del canvas ─────────────────────────────────────────────────────── */
+.panel-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#canvas {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: #0a1628;
+  display: block;
+}
+
+/* ── Leyenda ──────────────────────────────────────────────────────────────── */
+.leyenda {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.8rem;
+  color: var(--text-sec);
+  flex-wrap: wrap;
+}
+
+.leyenda-item { display: flex; align-items: center; gap: 5px; }
+
+.dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot.naranja { background: #f5a623; }
+.dot.celeste { background: #5ecff0; }
+.dot.gris    { background: rgba(255,255,255,0.25); }
+
+/* ── Sección de ecuaciones ────────────────────────────────────────────────── */
+.ecuaciones {
+  max-width: 1100px;
+  margin: 2rem auto 0;
+  padding: 1.5rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ecuaciones h2 {
+  font-size: 1rem;
+  color: var(--text-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.eq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.eq-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.eq-card h3 {
+  font-size: 0.875rem;
+  color: var(--accent-blue);
+  margin-bottom: 0.5rem;
+}
+
+.eq {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.eq-explicacion {
+  font-size: 0.85rem;
+  color: var(--text-sec);
+  line-height: 1.7;
+}
+
+.eq-explicacion strong { color: var(--accent-red); }
