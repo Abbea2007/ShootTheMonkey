@@ -65,7 +65,6 @@ def calcular():
     vy = vel * math.sin(angulo_rad)   # velocidad vertical inicial
 
     # Tiempo teórico de impacto: cuando el proyectil recorre la distancia horizontal
-    # x(t) = vx * t  →  t = dist / vx
     if vx == 0:
         return jsonify({"error": "Velocidad horizontal cero"})
 
@@ -80,14 +79,10 @@ def calcular():
     t = 0.0
     while t <= tiempo_impacto + 0.5:
         # Posición del proyectil (movimiento parabólico)
-        # x(t) = vx * t
-        # y(t) = vy * t - (1/2) * g * t²
         px = vx * t
         py = vy * t - 0.5 * g * t * t
 
         # Posición del mono (caída libre desde su altura inicial)
-        # x_mono = dist (no se mueve horizontalmente)
-        # y_mono = altura - (1/2) * g * t²
         mx = dist
         my = altura - 0.5 * g * t * t
 

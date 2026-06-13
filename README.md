@@ -8,7 +8,7 @@ La aplicacion permite ajustar la velocidad inicial, la distancia horizontal al m
 
 El experimento muestra que si el proyectil se dispara apuntando directamente al mono en el instante en que el mono empieza a caer, ambos se encuentran aunque exista gravedad.
 
-Esto ocurre porque la gravedad afecta por igual al proyectil y al mono. En las ecuaciones verticales, el termino de caida libre se cancela al comparar sus posiciones relativas.
+Esto ocurre porque la gravedad afecta por igual al proyectil y al mono.
 
 ## Tecnologias
 
@@ -119,28 +119,6 @@ Ejemplo de respuesta:
     "y": 11.15
   }
 }
-```
-
-## Ecuaciones usadas
-
-Para el proyectil:
-
-```text
-x(t) = v * cos(theta) * t
-y(t) = v * sin(theta) * t - 1/2 * g * t^2
-```
-
-Para el mono:
-
-```text
-x_m = D
-y_m(t) = H - 1/2 * g * t^2
-```
-
-El angulo de disparo se calcula con:
-
-```text
-theta = atan2(H, D)
 ```
 
 ## Notas
