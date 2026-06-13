@@ -12,7 +12,6 @@ Rutas que definimos:
 from flask import Flask, render_template, request, jsonify
 import math
 
-# Flask(__name__) crea la aplicación.
 # __name__ le dice a Flask dónde buscar la carpeta templates/ y static/
 app = Flask(__name__)
 
