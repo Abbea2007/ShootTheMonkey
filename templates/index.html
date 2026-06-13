@@ -74,32 +74,6 @@
 
   </main>
 
-  <!-- ── Sección de ecuaciones ─────────────────────────────── -->
-  <section class="ecuaciones">
-    <h2>Las ecuaciones</h2>
-    <div class="eq-grid">
-      <div class="eq-card">
-        <h3>Proyectil</h3>
-        <p class="eq">x(t) = v·cos(θ)·t</p>
-        <p class="eq">y(t) = v·sin(θ)·t − ½·g·t²</p>
-      </div>
-      <div class="eq-card">
-        <h3>Mono (caída libre)</h3>
-        <p class="eq">x<sub>m</sub> = D (constante)</p>
-        <p class="eq">y<sub>m</sub>(t) = H − ½·g·t²</p>
-      </div>
-      <div class="eq-card">
-        <h3>¿Por qué siempre se encuentran?</h3>
-        <p class="eq-explicacion">
-          La diferencia vertical es:<br>
-          Δy = y(t) − y<sub>m</sub>(t) = v·sin(θ)·t<br>
-          El término <strong>−½·g·t²</strong> se cancela.<br>
-          La gravedad afecta igual a ambos.
-        </p>
-      </div>
-    </div>
-  </section>
-
   <script src="{{ url_for('static', filename='simulation.js') }}"></script>
 </body>
 </html>
