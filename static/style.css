@@ -117,11 +117,16 @@ input[type="range"] {
 }
 
 .valor {
+  width: 100%;
+  background: transparent;
+  border: 0;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--accent);
   text-align: right;
 }
+
+.valor:focus { outline: 1px solid var(--accent); }
 
 /* ── Botones ──────────────────────────────────────────────────────────────── */
 .botones {
