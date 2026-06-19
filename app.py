@@ -13,8 +13,8 @@ from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
+
 DT = 0.016
-EXTRA_TIME = 0.5
 IMPACT_RADIUS = 1.5
 
 
@@ -44,8 +44,8 @@ def point(px, py, mx, my, t):
 
 def calculate_trajectory(vel, dist, altura, gravedad):
     angle = math.atan2(altura, dist)
-    vx = vel * math.cos(angle)
-    vy = vel * math.sin(angle)
+    vx = vel * math.cos(angle) #componente horizontal de la velocidad
+    vy = vel * math.sin(angle) # componente vertical de la velocidad
 
     if abs(vx) < 1e-9:
         raise ValueError("Velocidad horizontal cero")
@@ -55,7 +55,8 @@ def calculate_trajectory(vel, dist, altura, gravedad):
     impact = None
     t = 0.0
 
-    while t <= impact_time + EXTRA_TIME:
+    #calculos de cad instante 
+    while t <= impact_time:
         px = vx * t
         py = vy * t - 0.5 * gravedad * t * t
         mx = dist
@@ -63,10 +64,11 @@ def calculate_trajectory(vel, dist, altura, gravedad):
 
         frames.append(point(px, py, mx, my, t))
 
+        #calcula distancia real entre proctil y el mono 
         if impact is None and math.hypot(px - mx, py - my) < IMPACT_RADIUS:
             impact = {"t": round(t, 3), "x": round(px, 2), "y": round(py, 2)}
 
-        if (py < -2 and my < -2) or px > dist + 5:
+        if py < -2 and my < -2:
             break
 
         t += DT
