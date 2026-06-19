@@ -3,67 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Shoot the Monkey — Movimiento Parabólico</title>
-  <!--
-    Flask sirve archivos estáticos desde la carpeta static/.
-    url_for('static', filename='...') genera la ruta correcta automáticamente.
-  -->
+  <title>Shoot the Monkey - Movimiento Parabolico</title>
+  <!-- Interfaz: Flask resuelve la ruta al archivo de estilos. -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-
   <header>
-    <h1>🎯 Shoot the Monkey</h1>
-    <p class="subtitle">Demostración de movimiento parabólico y caída libre</p>
+    <h1>Shoot the Monkey</h1>
+    <p class="subtitle">Demostracion de movimiento parabolico y caida libre</p>
   </header>
 
   <main>
-
-    <!-- ── Panel de controles ─────────────────────────────── -->
+    <!-- Interfaz: cada deslizador tiene un campo numerico para escritura directa. -->
     <section class="panel-controles">
-      <h2>Parámetros</h2>
+      <h2>Parametros</h2>
 
       <div class="control-group">
         <label for="vel">Velocidad inicial <span class="unit">m/s</span></label>
         <input type="range" id="vel" min="10" max="60" value="30" step="1">
-        <span class="valor" id="vel-val">30</span>
+        <input class="valor" type="number" id="vel-val" min="10" max="60" value="30" step="1" aria-label="Velocidad inicial">
       </div>
 
       <div class="control-group">
         <label for="dist">Distancia al mono <span class="unit">m</span></label>
         <input type="range" id="dist" min="10" max="55" value="35" step="1">
-        <span class="valor" id="dist-val">35</span>
+        <input class="valor" type="number" id="dist-val" min="10" max="55" value="35" step="1" aria-label="Distancia al mono">
       </div>
 
       <div class="control-group">
         <label for="altura">Altura del mono <span class="unit">m</span></label>
         <input type="range" id="altura" min="5" max="30" value="20" step="1">
-        <span class="valor" id="altura-val">20</span>
+        <input class="valor" type="number" id="altura-val" min="5" max="30" value="20" step="1" aria-label="Altura del mono">
       </div>
 
       <div class="control-group">
-        <label for="gravedad">Gravedad <span class="unit">m/s²</span></label>
+        <label for="gravedad">Gravedad <span class="unit">m/s2</span></label>
         <input type="range" id="gravedad" min="1" max="20" value="9.8" step="0.1">
-        <span class="valor" id="gravedad-val">9.8</span>
+        <input class="valor" type="number" id="gravedad-val" min="1" max="20" value="9.8" step="0.1" aria-label="Gravedad">
       </div>
 
       <div class="botones">
-        <button id="btn-disparar" class="btn-primario">▶ Disparar</button>
-        <button id="btn-reset" class="btn-secundario">↺ Reiniciar</button>
+        <button id="btn-disparar" class="btn-primario">Disparar</button>
+        <button id="btn-reset" class="btn-secundario">Reiniciar</button>
       </div>
 
-      <!-- Datos calculados que vienen desde Python/Flask -->
       <div class="info-box" id="info-box">
-        <p>Ajustá los parámetros y presioná <strong>Disparar</strong>.</p>
+        <p>Ajusta los parametros y presiona <strong>Disparar</strong>.</p>
       </div>
     </section>
 
-    <!-- ── Canvas de simulación ───────────────────────────── -->
+    <!-- Interfaz: el canvas muestra los frames que devuelve el servidor. -->
     <section class="panel-canvas">
-      <!--
-        <canvas> es el elemento HTML donde JavaScript dibuja la simulación.
-        Toda la animación se hace con la Canvas API (sin librerías externas).
-      -->
       <canvas id="canvas" width="700" height="420"></canvas>
       <div class="leyenda">
         <span class="leyenda-item"><span class="dot naranja"></span> Proyectil</span>
@@ -71,7 +61,6 @@
         <span class="leyenda-item"><span class="dot gris"></span> Sin gravedad (referencia)</span>
       </div>
     </section>
-
   </main>
 
   <script src="{{ url_for('static', filename='simulation.js') }}"></script>
