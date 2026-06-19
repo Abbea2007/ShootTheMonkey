@@ -16,7 +16,7 @@ let frame = 0;
 let animation = null;
 let running = false;
 
-// Interfaz: el campo numerico y el deslizador siempre representan el mismo valor.
+//función que lee los valores 
 function params() {
   return Object.fromEntries(ids.map((id) => [id, Number(sliders[id].value)]));
 }
