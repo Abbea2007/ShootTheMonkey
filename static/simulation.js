@@ -1,417 +1,236 @@
-/**
- * simulation.js — Motor de animación del canvas
- * ==============================================
- * Este archivo maneja:
- *   1. Leer los controles HTML (sliders)
- *   2. Pedir los datos calculados a Flask (fetch API)
- *   3. Animar la simulación frame a frame con requestAnimationFrame
- *   4. Dibujar todo en el <canvas> con la Canvas 2D API
- *
- * Conceptos clave de JavaScript que usamos:
- *   - fetch()                → hace peticiones HTTP (como un navegador)
- *   - async/await            → espera una respuesta sin bloquear la página
- *   - requestAnimationFrame  → llama a una función ~60 veces por segundo
- *   - Canvas 2D API          → dibuja formas, líneas, texto en el canvas
- */
+// Logica: recoge parametros, pide el calculo al servidor y dibuja cada frame.
 
-// ─── Referencia al canvas y su contexto de dibujo ───────────────────────────
 const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");  // "2d" → contexto de dibujo 2D
-const W = canvas.width;   // 700
-const H = canvas.height;  // 420
+const ctx = canvas.getContext("2d");
+const ids = ["vel", "dist", "altura", "gravedad"];
+const sliders = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
+const fields = Object.fromEntries(ids.map((id) => [id, document.getElementById(`${id}-val`)]));
+const shoot = document.getElementById("btn-disparar");
+const reset = document.getElementById("btn-reset");
+const info = document.getElementById("info-box");
+const pad = { left: 55, right: 20, top: 25, bottom: 45 };
+const plot = { width: 625, height: 350 };
 
-// ─── Estado de la simulación ─────────────────────────────────────────────────
-let frames = [];       // lista de frames que devuelve Flask
-let frameIndex = 0;   // frame actual de la animación
-let animId = null;    // ID del requestAnimationFrame (para cancelarlo)
+let result = null;
+let frame = 0;
+let animation = null;
 let running = false;
-let resultado = null; // objeto con angulo, tiempo_impacto, impacto
 
-// ─── Márgenes del área de dibujo ─────────────────────────────────────────────
-const PAD = { l: 55, r: 20, t: 25, b: 45 };
-const plotW = W - PAD.l - PAD.r;
-const plotH = H - PAD.t - PAD.b;
-
-// ─── Leer valores actuales de los sliders ────────────────────────────────────
-function getParams() {
-  return {
-    vel:      parseFloat(document.getElementById("vel").value),
-    dist:     parseFloat(document.getElementById("dist").value),
-    altura:   parseFloat(document.getElementById("altura").value),
-    gravedad: parseFloat(document.getElementById("gravedad").value),
-  };
+// Interfaz: el campo numerico y el deslizador siempre representan el mismo valor.
+function params() {
+  return Object.fromEntries(ids.map((id) => [id, Number(sliders[id].value)]));
 }
 
-// ─── Convertir coordenadas del mundo (metros) a pixels del canvas ─────────────
-function worldToCanvas(wx, wy, maxX, maxY) {
-  const cx = PAD.l + (wx / maxX) * plotW;
-  const cy = H - PAD.b - (wy / maxY) * plotH;
-  return [cx, cy];
-}
-
-// ─── Actualizar etiquetas de los sliders en tiempo real ───────────────────────
-function actualizarLabels() {
-  const p = getParams();
-  document.getElementById("vel-val").textContent     = p.vel;
-  document.getElementById("dist-val").textContent    = p.dist;
-  document.getElementById("altura-val").textContent  = p.altura;
-  document.getElementById("gravedad-val").textContent = p.gravedad.toFixed(1);
-}
-
-["vel", "dist", "altura", "gravedad"].forEach(id => {
-  document.getElementById(id).addEventListener("input", () => {
-    actualizarLabels();
-    resetear();
-    dibujarEscena(null, null, getParams());
+function syncFields() {
+  const values = params();
+  ids.forEach((id) => {
+    fields[id].value = id === "gravedad" ? values[id].toFixed(1) : values[id];
   });
-});
+}
 
-// ─── DIBUJAR ESCENA COMPLETA ──────────────────────────────────────────────────
-/**
- * @param {number|null} frameIdx  - índice del frame actual (null = estado inicial)
- * @param {Array|null}  framesData - lista completa de frames
- * @param {Object}      params     - parámetros actuales
- */
-function dibujarEscena(frameIdx, framesData, params) {
-  ctx.clearRect(0, 0, W, H);
+function limits(input, value) {
+  return Math.min(Math.max(value, Number(input.min)), Number(input.max));
+}
 
-  const { dist, altura } = params;
-  const maxX = Math.max(60, dist + 6);
-  const maxY = Math.max(28, altura + 6);
+function point(x, y, maxX, maxY) {
+  return [
+    pad.left + (x / maxX) * plot.width,
+    canvas.height - pad.bottom - (y / maxY) * plot.height,
+  ];
+}
 
-  // ── Fondo y grilla ──────────────────────────────────────────────────────────
-  ctx.fillStyle = "#0a1628";
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.strokeStyle = "rgba(255,255,255,0.04)";
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i <= 6; i++) {
-    const gx = PAD.l + (i / 6) * plotW;
-    ctx.beginPath(); ctx.moveTo(gx, PAD.t); ctx.lineTo(gx, H - PAD.b); ctx.stroke();
-  }
-  for (let i = 0; i <= 5; i++) {
-    const gy = PAD.t + (i / 5) * plotH;
-    ctx.beginPath(); ctx.moveTo(PAD.l, gy); ctx.lineTo(W - PAD.r, gy); ctx.stroke();
-  }
-
-  // ── Ejes ────────────────────────────────────────────────────────────────────
-  ctx.strokeStyle = "rgba(255,255,255,0.3)";
-  ctx.lineWidth = 1;
+function line(x1, y1, x2, y2, color, width = 1, dash = []) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.setLineDash(dash);
   ctx.beginPath();
-  ctx.moveTo(PAD.l, H - PAD.b); ctx.lineTo(W - PAD.r, H - PAD.b); // eje X
-  ctx.moveTo(PAD.l, H - PAD.b); ctx.lineTo(PAD.l, PAD.t);          // eje Y
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
   ctx.stroke();
+  ctx.restore();
+}
 
-  // Etiquetas numéricas de los ejes
-  ctx.fillStyle = "rgba(255,255,255,0.3)";
-  ctx.font = "10px sans-serif";
+function circle(x, y, radius, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function text(value, x, y, color = "rgba(255,255,255,0.4)", font = "11px sans-serif") {
+  ctx.fillStyle = color;
+  ctx.font = font;
   ctx.textAlign = "center";
+  ctx.fillText(value, x, y);
+}
+
+// Dibujo base de la simulacion: fondo, escala, ejes, arbol y linea objetivo.
+function drawBase(values, maxX, maxY) {
+  ctx.fillStyle = "#0a1628";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i <= 6; i++) {
+    const x = pad.left + (i / 6) * plot.width;
+    line(x, pad.top, x, canvas.height - pad.bottom, "rgba(255,255,255,0.04)", 0.5);
+  }
   for (let i = 0; i <= 5; i++) {
-    const val = Math.round((i / 5) * maxX);
-    const gx = PAD.l + (i / 5) * plotW;
-    ctx.fillText(val + "m", gx, H - PAD.b + 14);
+    const y = pad.top + (i / 5) * plot.height;
+    line(pad.left, y, canvas.width - pad.right, y, "rgba(255,255,255,0.04)", 0.5);
+  }
+
+  line(pad.left, canvas.height - pad.bottom, canvas.width - pad.right, canvas.height - pad.bottom, "rgba(255,255,255,0.3)");
+  line(pad.left, canvas.height - pad.bottom, pad.left, pad.top, "rgba(255,255,255,0.3)");
+
+  for (let i = 0; i <= 5; i++) {
+    text(`${Math.round((i / 5) * maxX)}m`, pad.left + (i / 5) * plot.width, canvas.height - pad.bottom + 14);
   }
   ctx.textAlign = "right";
   for (let i = 0; i <= 4; i++) {
-    const val = Math.round((i / 4) * maxY);
-    const gy = H - PAD.b - (i / 4) * plotH;
-    ctx.fillText(val + "m", PAD.l - 6, gy + 3);
+    text(`${Math.round((i / 4) * maxY)}m`, pad.left - 6, canvas.height - pad.bottom - (i / 4) * plot.height + 3);
   }
+  text("Distancia (m)", pad.left + plot.width / 2, canvas.height - 5);
 
-  // Etiquetas de ejes
-  ctx.fillStyle = "rgba(255,255,255,0.4)";
-  ctx.font = "11px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Distancia (m)", PAD.l + plotW / 2, H - 5);
-  ctx.save();
-  ctx.translate(14, PAD.t + plotH / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText("Altura (m)", 0, 0);
-  ctx.restore();
+  const [treeX] = point(values.dist, 0, maxX, maxY);
+  const [, crownY] = point(values.dist, values.altura + 3, maxX, maxY);
+  line(treeX, canvas.height - pad.bottom, treeX, crownY + 10, "#5a3d1e", 5);
+  [[treeX, crownY - 5, 30, 24], [treeX - 14, crownY + 4, 20, 15], [treeX + 12, crownY + 2, 18, 15]].forEach(([x, y, rx, ry]) => {
+    ctx.fillStyle = "#1e5c1e";
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
 
-  // ── Árbol ───────────────────────────────────────────────────────────────────
-  const [tx, ty0] = worldToCanvas(dist, 0, maxX, maxY);
-  const [, ty2]   = worldToCanvas(dist, altura + 3, maxX, maxY);
-
-  // Tronco
-  ctx.strokeStyle = "#5a3d1e";
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(tx, H - PAD.b);
-  ctx.lineTo(tx, ty2 + 10);
-  ctx.stroke();
-
-  // Follaje
-  ctx.fillStyle = "#1a4a1a";
-  ctx.beginPath(); ctx.ellipse(tx, ty2 - 5, 30, 24, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#1e5c1e";
-  ctx.beginPath(); ctx.ellipse(tx - 14, ty2 + 4, 20, 15, -0.3, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(tx + 12, ty2 + 2, 18, 15, 0.3, 0, Math.PI * 2); ctx.fill();
-
-  // ── Línea de referencia sin gravedad (línea recta al mono) ──────────────────
   if (!running) {
-    const [ox, oy] = worldToCanvas(0, 0, maxX, maxY);
-    const [mx0, my0] = worldToCanvas(dist, altura, maxX, maxY);
-    ctx.setLineDash([5, 7]);
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(ox, oy);
-    ctx.lineTo(mx0, my0);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  // ── Estado inicial (sin animar): mono en su posición y cañón ────────────────
-  if (frameIdx === null || framesData === null) {
-    // Mono estático
-    dibujarMono(ctx, ...worldToCanvas(dist, altura, maxX, maxY), false);
-
-    // Cañón
-    const angle = Math.atan2(altura, dist);
-    dibujarCanon(ctx, ...worldToCanvas(0, 0, maxX, maxY), angle);
-
-    // Ángulo label
-    const angDeg = (Math.atan2(altura, dist) * 180 / Math.PI).toFixed(1);
-    ctx.fillStyle = "rgba(245,166,35,0.7)";
-    ctx.font = "11px sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("θ = " + angDeg + "°", PAD.l + 35, H - PAD.b - 10);
-    return;
-  }
-
-  // ── Animación: dibujar trayectoria hasta el frame actual ─────────────────────
-  const frame = framesData[frameIdx];
-
-  // Trail del proyectil
-  if (frameIdx > 0) {
-    ctx.beginPath();
-    ctx.strokeStyle = "rgba(245,166,35,0.5)";
-    ctx.lineWidth = 2;
-    for (let i = 0; i <= frameIdx && i < framesData.length; i++) {
-      const f = framesData[i];
-      const [cx, cy] = worldToCanvas(f.px, Math.max(f.py, -1), maxX, maxY);
-      if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
-    }
-    ctx.stroke();
-
-    // Trail del mono
-    ctx.beginPath();
-    ctx.strokeStyle = "rgba(94,207,240,0.35)";
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i <= frameIdx && i < framesData.length; i++) {
-      const f = framesData[i];
-      const [cx, cy] = worldToCanvas(f.mx, Math.max(f.my, -1), maxX, maxY);
-      if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
-    }
-    ctx.stroke();
-  }
-
-  // Proyectil actual
-  if (frame.py >= -1 && frame.px <= maxX) {
-    const [px, py] = worldToCanvas(frame.px, frame.py, maxX, maxY);
-    // Glow
-    const grad = ctx.createRadialGradient(px, py, 0, px, py, 18);
-    grad.addColorStop(0, "rgba(245,166,35,0.6)");
-    grad.addColorStop(1, "rgba(245,166,35,0)");
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(px, py, 18, 0, Math.PI * 2); ctx.fill();
-    // Bola
-    ctx.fillStyle = "#f5a623";
-    ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill();
-  }
-
-  // Mono en caída
-  if (frame.my >= -1) {
-    const [mx, my] = worldToCanvas(frame.mx, frame.my, maxX, maxY);
-    dibujarMono(ctx, mx, my, true);
-  }
-
-  // ── Explosión si hubo impacto ────────────────────────────────────────────────
-  if (resultado && resultado.impacto && frame.t >= resultado.impacto.t) {
-    const { x, y } = resultado.impacto;
-    const [ix, iy] = worldToCanvas(x, y, maxX, maxY);
-    const elapsed = frame.t - resultado.impacto.t;
-    const alpha = Math.max(0, 1 - elapsed * 2.5);
-
-    ctx.globalAlpha = alpha;
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      const r = 20 + elapsed * 80;
-      ctx.fillStyle = i % 2 === 0 ? "#ff6b6b" : "#f5a623";
-      ctx.beginPath();
-      ctx.arc(ix + Math.cos(a) * r, iy + Math.sin(a) * r, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-
-    if (elapsed < 1.5) {
-      ctx.fillStyle = "#ff6b6b";
-      ctx.font = "bold 16px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("¡Impacto! 🎯", ix, iy - 30 - elapsed * 30);
-    }
+    line(...point(0, 0, maxX, maxY), ...point(values.dist, values.altura, maxX, maxY), "rgba(255,255,255,0.15)", 1, [5, 7]);
   }
 }
 
-// ─── Dibujar el mono ──────────────────────────────────────────────────────────
-function dibujarMono(ctx, x, y, cayendo) {
-  // Cuerpo
-  ctx.fillStyle = "#5ecff0";
-  ctx.beginPath(); ctx.arc(x, y - 8, 8, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#3ab0d5";
-  ctx.beginPath(); ctx.arc(x, y + 2, 6, 0, Math.PI * 2); ctx.fill();
-  // Ojos
-  ctx.fillStyle = "#fff";
-  ctx.beginPath(); ctx.arc(x - 3, y - 9, 2, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + 3, y - 9, 2, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#000";
-  ctx.beginPath(); ctx.arc(x - 3, y - 9, 1, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + 3, y - 9, 1, 0, Math.PI * 2); ctx.fill();
-  // Cola
-  ctx.strokeStyle = "#3ab0d5";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x + 5, y + 6);
-  ctx.quadraticCurveTo(x + 18, y + 14, x + 12, y + 22);
-  ctx.stroke();
-
-  if (cayendo) {
-    ctx.fillStyle = "rgba(94,207,240,0.6)";
-    ctx.font = "10px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("¡Cayendo!", x, y - 22);
-  }
+function drawMonkey(x, y, falling) {
+  circle(x, y - 8, 8, "#5ecff0");
+  circle(x, y + 2, 6, "#3ab0d5");
+  circle(x - 3, y - 9, 2, "#fff");
+  circle(x + 3, y - 9, 2, "#fff");
+  circle(x - 3, y - 9, 1, "#000");
+  circle(x + 3, y - 9, 1, "#000");
+  line(x + 5, y + 6, x + 12, y + 22, "#3ab0d5", 2);
+  if (falling) text("Cayendo", x, y - 22, "rgba(94,207,240,0.6)", "10px sans-serif");
 }
 
-// ─── Dibujar el cañón ─────────────────────────────────────────────────────────
-function dibujarCanon(ctx, x, y, angle) {
+function drawCannon(x, y, angle) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-angle);
   ctx.fillStyle = "#7a8090";
-  ctx.beginPath();
-  ctx.roundRect(-5, -5, 28, 10, 3);
-  ctx.fill();
-  ctx.fillStyle = "#555";
-  ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(-5, -5, 28, 10);
+  circle(0, 0, 7, "#555");
   ctx.restore();
 }
 
-// ─── FETCH a Flask: pedir el cálculo físico ───────────────────────────────────
-/**
- * fetch() hace una petición HTTP desde JavaScript.
- * - method: "POST" → enviamos datos al servidor
- * - headers: le decimos a Flask que enviamos JSON
- * - body: los parámetros convertidos a texto JSON
- *
- * async/await → esperamos la respuesta sin bloquear la UI
- */
-async function pedirSimulacion(params) {
-  const response = await fetch("/calcular", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify(params),
+function drawPath(keyX, keyY, color, width, maxX, maxY) {
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  result.frames.slice(0, frame + 1).forEach((item, index) => {
+    const [x, y] = point(item[keyX], Math.max(item[keyY], -1), maxX, maxY);
+    index ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
   });
-
-  // .json() convierte la respuesta a objeto JavaScript
-  const data = await response.json();
-  return data;
+  ctx.stroke();
 }
 
-// ─── ANIMAR frame a frame ─────────────────────────────────────────────────────
-/**
- * requestAnimationFrame(callback) → el navegador llama a callback
- * antes del siguiente repintado de pantalla (~60 veces por segundo).
- * Es más eficiente que setInterval para animaciones.
- */
-function animar(params) {
-  if (frameIndex >= frames.length) {
-    running = false;
-    document.getElementById("btn-disparar").textContent = "▶ Disparar";
+// Logica visual: usa el frame actual, sin recalcular la fisica en el navegador.
+function draw(values) {
+  const maxX = Math.max(60, values.dist + 6);
+  const maxY = Math.max(28, values.altura + 6);
+  drawBase(values, maxX, maxY);
+
+  if (!result) {
+    const angle = Math.atan2(values.altura, values.dist);
+    drawMonkey(...point(values.dist, values.altura, maxX, maxY), false);
+    drawCannon(...point(0, 0, maxX, maxY), angle);
+    text(`Angulo: ${(angle * 180 / Math.PI).toFixed(1)} grados`, pad.left + 80, canvas.height - pad.bottom - 10, "rgba(245,166,35,0.7)");
     return;
   }
 
-  dibujarEscena(frameIndex, frames, params);
-  frameIndex++;
+  const current = result.frames[frame];
+  drawPath("px", "py", "rgba(245,166,35,0.5)", 2, maxX, maxY);
+  drawPath("mx", "my", "rgba(94,207,240,0.35)", 1.5, maxX, maxY);
 
-  // Velocidad de animación: saltamos frames para ir más rápido
-  frameIndex++;  // 2 frames por tick ≈ 30fps simulado
-
-  animId = requestAnimationFrame(() => animar(params));
+  if (current.py >= -1) {
+    const [x, y] = point(current.px, current.py, maxX, maxY);
+    circle(x, y, 6, "#f5a623");
+  }
+  if (current.my >= -1) drawMonkey(...point(current.mx, current.my, maxX, maxY), true);
 }
 
-// ─── Actualizar info box con los datos de Flask ───────────────────────────────
-function actualizarInfoBox(data) {
-  const box = document.getElementById("info-box");
-  const imp = data.impacto;
-  box.innerHTML = `
-    <div class="dato">
-      <span class="etiqueta">Ángulo de disparo</span>
-      <span class="numero">${data.angulo}°</span>
-    </div>
-    <div class="dato">
-      <span class="etiqueta">Tiempo de impacto</span>
-      <span class="numero">${data.tiempo_impacto} s</span>
-    </div>
-    <div class="dato">
-      <span class="etiqueta">¿Impacto?</span>
-      <span class="numero" style="color:${imp ? '#3fb950' : '#ff6b6b'}">
-        ${imp ? `✓ t=${imp.t}s` : "✗ No alcanzó"}
-      </span>
-    </div>
-    ${imp ? `
-    <div class="dato">
-      <span class="etiqueta">Posición impacto</span>
-      <span class="numero">(${imp.x}m, ${imp.y}m)</span>
-    </div>` : ""}
-  `;
-}
-
-// ─── Resetear simulación ──────────────────────────────────────────────────────
-function resetear() {
-  cancelAnimationFrame(animId);
+function stop() {
+  cancelAnimationFrame(animation);
+  result = null;
+  frame = 0;
   running = false;
-  frames = [];
-  frameIndex = 0;
-  resultado = null;
-  document.getElementById("btn-disparar").textContent = "▶ Disparar";
+  shoot.textContent = "Disparar";
 }
 
-// ─── Botón DISPARAR ───────────────────────────────────────────────────────────
-document.getElementById("btn-disparar").addEventListener("click", async () => {
-  if (running) return;
+function showResult(data) {
+  const impact = data.impacto;
+  info.innerHTML = `
+    <div class="dato"><span class="etiqueta">Angulo de disparo</span><span class="numero">${data.angulo} grados</span></div>
+    <div class="dato"><span class="etiqueta">Tiempo de impacto</span><span class="numero">${data.tiempo_impacto} s</span></div>
+    <div class="dato"><span class="etiqueta">Impacto</span><span class="numero" style="color:${impact ? "#3fb950" : "#ff6b6b"}">${impact ? `Si, t=${impact.t}s` : "No alcanzo"}</span></div>
+    ${impact ? `<div class="dato"><span class="etiqueta">Posicion de impacto</span><span class="numero">(${impact.x}m, ${impact.y}m)</span></div>` : ""}`;
+}
 
-  resetear();
-  const params = getParams();
-
-  // 1. Pedimos la física a Flask (esto es asíncrono — esperamos la respuesta)
-  document.getElementById("btn-disparar").textContent = "⏳ Calculando...";
-  resultado = await pedirSimulacion(params);
-
-  if (resultado.error) {
-    alert("Error: " + resultado.error);
+function animate(values) {
+  if (frame >= result.frames.length) {
+    running = false;
+    shoot.textContent = "Disparar";
     return;
   }
+  draw(values);
+  frame += 2;
+  animation = requestAnimationFrame(() => animate(values));
+}
 
-  // 2. Guardamos los frames y actualizamos la UI
-  frames = resultado.frames;
-  actualizarInfoBox(resultado);
+ids.forEach((id) => {
+  sliders[id].addEventListener("input", () => {
+    syncFields();
+    stop();
+    draw(params());
+  });
+  fields[id].addEventListener("input", () => {
+    const value = Number(fields[id].value);
+    if (fields[id].value === "" || Number.isNaN(value)) return;
+    sliders[id].value = limits(sliders[id], value);
+    syncFields();
+    stop();
+    draw(params());
+  });
+});
 
-  // 3. Arrancamos la animación
+shoot.addEventListener("click", async () => {
+  if (running) return;
+  stop();
+  shoot.textContent = "Calculando...";
+  const values = params();
+  const response = await fetch("/calcular", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
+  result = await response.json();
+  if (result.error) {
+    alert(`Error: ${result.error}`);
+    stop();
+    draw(values);
+    return;
+  }
+  showResult(result);
   running = true;
-  document.getElementById("btn-disparar").textContent = "⏸ Simulando...";
-  animar(params);
+  shoot.textContent = "Simulando...";
+  animate(values);
 });
 
-// ─── Botón REINICIAR ──────────────────────────────────────────────────────────
-document.getElementById("btn-reset").addEventListener("click", () => {
-  resetear();
-  dibujarEscena(null, null, getParams());
-  document.getElementById("info-box").innerHTML =
-    "<p>Ajustá los parámetros y presioná <strong>Disparar</strong>.</p>";
+reset.addEventListener("click", () => {
+  stop();
+  info.innerHTML = "<p>Ajusta los parametros y presiona <strong>Disparar</strong>.</p>";
+  draw(params());
 });
 
-// ─── Dibujo inicial ───────────────────────────────────────────────────────────
-actualizarLabels();
-dibujarEscena(null, null, getParams());
+syncFields();
+draw(params());
